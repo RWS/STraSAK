@@ -1,18 +1,8 @@
-﻿param([String]$StudioVersion = "Studio5")
-
-if ("${Env:ProgramFiles(x86)}") {
-	$ProgramFilesDir = "${Env:ProgramFiles(x86)}"
-}
-else {
-	$ProgramFilesDir = "${Env:ProgramFiles}"
-}
-
-Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.FileBased.dll"
-Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.Core.dll"
-Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectApi.dll"
+﻿param ([string] $studioVersion = "Studio18")
 
 # Helper for handling PowerShell runspace issues with multithreaded event handlers
 # https://stackoverflow.com/questions/53788232/system-threading-timer-kills-the-powershell-console/53789011
+
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -55,30 +45,6 @@ public class RunspacedDelegateFactory
 '@
 
 $LanguagesSeparator = "\s+|;\s*|,\s*"
-
-$StudioVersionsMap = @{
-	Studio2  = "10.0.0.0"
-	Studio3  = "11.0.0.0"
-	Studio4  = "12.0.0.0"
-	Studio5  = "14.0.0.0"
-	Studio15 = "15.0.0.0"
-	Studio16 = "16.0.0.0"
-}
-
-function Get-DefaultProjectTemplate {
-	##########################################################################################################
-	# Due to API bug basing new projects on "Default.sdltpl" template instead of actual default project template,
-	# we need to find the real default template configured in Trados Studio by reading the configuration files
-	$StudioVersionAppData = $StudioVersionsMap[$StudioVersion]
-	# Get default project template GUID from the user settings file
-	$UserSettingsFilePath = "${Env:AppData}\SDL\SDL Trados Studio\$StudioVersionAppData\UserSettings.xml"
-	$DefaultProjectTemplateGuid = (Select-Xml -Path $UserSettingsFilePath -XPath "//Setting[@Id='DefaultProjectTemplateGuid']").Node.InnerText
-	# Get user's project templates and get the default one using the GUID
-	$ProjectTemplates = [Sdl.ProjectApi.ApplicationFactory]::CreateApplication().LocalProjectServers[0].ProjectTemplates
-	$DefaultProjectTemplate = ($ProjectTemplates | Where-Object -Property Guid -eq $DefaultProjectTemplateGuid).FilePath
-	
-	return $DefaultProjectTemplate
-}
 
 function New-Project {
 <#
@@ -168,7 +134,7 @@ Analyze task is run after scanning, converting and copying to target languages.
 		# If this parameter is not specified, default project template set in Trados Studio will be used.
 		[Parameter (ParameterSetName = "ProjectTemplate")]
 		[Alias("PrjTpl")]
-		[String] $ProjectTemplate = $(Get-DefaultProjectTemplate),
+		[String] $ProjectTemplate = $null,
 
 		# Path to project file (*.sdlproj) on which the created project will be based.
 		[Parameter (ParameterSetName = "ProjectReference")]
@@ -219,9 +185,15 @@ Analyze task is run after scanning, converting and copying to target languages.
 	# Get project creation reference, depending on provided parameters
 	switch ($PsCmdlet.ParameterSetName) {
 		"ProjectTemplate" {
-			$ProjectTemplate = (Resolve-Path -LiteralPath $ProjectTemplate).ProviderPath
-			$ProjectCreationReference = New-Object Sdl.ProjectAutomation.Core.ProjectTemplateReference $ProjectTemplate
-			break
+			if ($ProjectTemplate)
+			{
+				$ProjectTemplate = (Resolve-Path -LiteralPath $ProjectTemplate).ProviderPath
+				$ProjectCreationReference = New-Object Sdl.ProjectAutomation.Core.ProjectTemplateReference $ProjectTemplate
+				break
+			}
+
+			$ProjectCreationReference = $null;
+			break;
 		}
 		"ProjectReference" {
 			$ProjectReference = (Resolve-Path -LiteralPath $ProjectReference).ProviderPath
@@ -252,7 +224,14 @@ Analyze task is run after scanning, converting and copying to target languages.
 	}
 
 	# Crete new project using creation reference and constructed project info
-	$Project = New-Object Sdl.ProjectAutomation.FileBased.FileBasedProject ($ProjectInfo, $ProjectCreationReference)
+	if ($ProjectCreationReference)
+	{
+		$Project = New-Object Sdl.ProjectAutomation.FileBased.FileBasedProject ($ProjectInfo, $ProjectCreationReference)
+	}
+	else 
+	{
+		$Project = New-Object Sdl.ProjectAutomation.FileBased.FileBasedProject ($ProjectInfo)
+	}
 
 	# Get project languages
 	$TargetLanguagesList = @($Project.GetProjectInfo().TargetLanguages.IsoAbbreviation)
@@ -1097,7 +1076,7 @@ function Validate-Task {
 
 function Validate-TaskSequence {
 	param (
-		[Sdl.ProjectAutomation.FileBased.TaskSequence] $TaskSequenceToValidate
+		[Sdl.ProjectAutomation.Core.TaskSequence] $TaskSequenceToValidate
 	)
 
 	ForEach ($Task in $TaskSequenceToValidate.SubTasks) {
@@ -1111,8 +1090,7 @@ Export-ModuleMember Get-Project
 Export-ModuleMember Remove-Project
 Export-ModuleMember ConvertTo-TradosLog
 Export-ModuleMember Export-TargetFiles
-Export-ModuleMember Update-MainTMs
+Export-ModuleMember Update-MainTMs 
 Export-ModuleMember PseudoTranslate -Alias Pseudo
 Export-ModuleMember Get-BilingualFileMappings
 Export-ModuleMember Get-TaskFileInfoFiles
-Export-ModuleMember Get-DefaultProjectTemplate
