@@ -118,6 +118,7 @@ call TS2017 Export-TargetFiles ^
 ```
 
 ## Known issues
+
 ### "log4net:ERROR: XmlConfigurator..." message displayed each time automation is started
 This is Trados Studio API bug. It's just a cosmetic issue and does not influence automation functionality.
 

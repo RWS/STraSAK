@@ -33,7 +33,6 @@ function Add-Dependencies {
         $appPath = "$ProgramFilesDir\Trados\Trados Studio\$StudioVersion\"
     }
 
-    # $appPath = "C:\Users\aflorescu\Code\TradosStudio\Bin\Mixed Platforms\Debug"
     # Solve dependency conficts
     Add-Type -Path $assemblyResolverPath;
     $assemblyResolver = New-Object DependencyResolver.AssemblyResolver("$appPath\");
