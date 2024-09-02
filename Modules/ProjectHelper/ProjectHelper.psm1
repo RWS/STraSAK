@@ -169,13 +169,11 @@ Analyze task is run after scanning, converting and copying to target languages.
 		
 		# Project source language locale code.
 		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
-		[Parameter (Mandatory = $true)]
 		[Alias("SrcLng")]
 		[String] $SourceLanguage,
 		
 		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
 		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
-		[Parameter (Mandatory = $true)]
 		[Alias("TrgLng")]
 		[String] $TargetLanguages,
 
